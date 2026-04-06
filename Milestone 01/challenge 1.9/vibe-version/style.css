@@ -1,0 +1,14 @@
+body{font-family: Arial, Helvetica, sans-serif;background:#f6f8fa;margin:0;padding:20px}
+.container{max-width:760px;margin:0 auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+h1{margin-top:0}
+ul.tasks{list-style:none;padding:0}
+ul.tasks li{padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between}
+.controls{margin-top:12px}
+button{padding:8px 12px;border-radius:4px;border:1px solid #ccc;background:#fff}
+body{font-family:Segoe UI,Arial,Helvetica,sans-serif;background:#f6f8fa;color:#222;margin:0;padding:20px}
+.app{max-width:760px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+h1{margin:0 0 12px}
+.task{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}
+.task:last-child{border-bottom:none}
+.controls{margin-top:12px}
+button{cursor:pointer}

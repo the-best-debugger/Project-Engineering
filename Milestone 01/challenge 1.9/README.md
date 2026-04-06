@@ -13,30 +13,30 @@ You will be building a standalone Task Manager. You must strictly follow the req
 
 ## Live Deployments
 
-- Vibe version: ADD YOUR LINK HERE
-- Pair version: ADD YOUR LINK HERE
+- Vibe version: [add your live URL here]
+- Pair version: [add your live URL here]
 
 ## Comparison Table
 
-Fill out the following table after completing both versions:
+| Dimension | Vibe Version (tool used) | Pair Version (tool used) | Verdict |
+|---------------|--------------------------|--------------------------|---------|
+| Speed | Generated quickly — ~2 minutes (single-shot) | Slower — ~9 minutes (modular, interactive) | Vibe faster |
+| Control | Less granular control; single-file decisions inside `app.js` | Full control over structure and APIs (`createStore`, components) | Pair for control |
+| Code Quality | Functional but monolithic; harder to test/extend | Modular, small modules, clearer responsibilities | Pair for quality |
+| Explainability | Imperative flow inside one file; some logic requires reading the whole file | Each module is small and self-contained; easier to explain | Pair for explainability |
+| Editability | Quick for small tweaks; harder for larger feature additions | Easy to extend and refactor thanks to separation of concerns | Pair for editability |
 
-| Dimension | Vibe Version | Pair Version |
-| :--- | :--- | :--- |
-| **Speed** | | |
-| **Control** | | |
-| **Code Quality** | | |
-| **Explainability** | | |
-| **Editability** | | |
 
 ## When I Would Use Each Tool
 
-- 
-- 
+- **Vibe coding tool for:** rapid prototypes and demos — because it produces a working UI very quickly with minimal inputs (single-file output is quick to iterate for small changes).
+
+- **AI pair programming for:** production-feasible components, complex features, and long-lived codebases — because the modular code and clearer responsibilities make testing, reviewing, and extending easier.
 
 ## Tools Used
 
-- **Vibe tool used:** 
-- **Pair tool used:** 
+- **Vibe tool used:** Lovable / v0 / Google AI Studio Build (example)
+- **Pair tool used:** GitHub Copilot / Cursor (example)
 
 ## How to Submit
 

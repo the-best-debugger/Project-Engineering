@@ -1,0 +1,6 @@
+body{font-family:Segoe UI,Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:20px}
+.app{max-width:760px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+h1{margin:0 0 12px}
+.task-list{list-style:none;padding:0}
+.task-list li{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee}
+.controls{margin-top:12px}

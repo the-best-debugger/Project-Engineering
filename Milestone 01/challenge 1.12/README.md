@@ -1,38 +1,38 @@
-# Challenge 1.12 — Build and Deploy Your First AI Chatbot
+# AI Chatbot (Challenge 1.12)
 
-## What This Is
+## What I Built
+A minimal AI chatbot with a Node.js Express backend and a React (Vite) frontend. The frontend sends the **full** conversation history (`messages[]`) to the backend on every turn, so the model can respond with context.
 
-This is the starter repository for Challenge 1.12. The structure is set up. Your job is to fill the gaps.
+## API and Model
+**API:** OpenRouter (`/api/v1/chat/completions`)  
+**Model:** `openai/gpt-4o-mini`
 
-## What Exists
+## Why the backend makes the AI call (not the frontend)
+If the API call is made from frontend JavaScript, the API key can be copied by anyone from the browser (DevTools / network tab) and then abused to spend your credits or impersonate your app. A backend proxy keeps the key server-side and never exposes it to users.
 
-| File | Status | What it does |
-|---|---|---|
-| backend/server.js | ⚠️ Incomplete | Express server. /chat route is empty. Fill it. |
-| frontend/index.html | ✅ Ready | Chat UI. Input, send button, display area all wired. |
-| frontend/script.js | ⚠️ Incomplete | sendMessage() exists. Fetch call is missing. Add it. |
-| frontend/style.css | ✅ Ready | Dark chat UI. No changes needed. |
-| backend/.env.example | ✅ Ready | Copy to .env and add your keys. |
+## Fallback provider (if OpenRouter credits run out)
+**Provider:** Google Gemini (OpenAI-compatible endpoint)  
+**Two code changes:**  
+- Change the base URL from `https://openrouter.ai/api/v1/chat/completions` to `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`  
+- Change the model name from `openai/gpt-4o-mini` to `gemini-1.5-flash` (and read the key from `process.env.GEMINI_API_KEY`)
 
-## What You Need to Add
+## Live Deployment
+**Frontend:** <!-- add Netlify/Vercel URL -->  
+**Backend:** <!-- add Render URL -->
 
-### 1. Your API keys
-Copy `.env.example` to `.env` inside the `backend/` folder:
+## Run Locally
+
+### Backend
+1. Create `backend/.env` (do not commit it):
+
 ```bash
 cp backend/.env.example backend/.env
 ```
-Add your OpenRouter key. Get one at openrouter.ai (free credits included).
 
-### 2. The backend /chat route
-Open `backend/server.js`. Find the TODO comment. Implement the AI API call there.
+2. Put your real key in `backend/.env`:
+- `OPENROUTER_API_KEY=...`
 
-### 3. The frontend fetch call
-Open `frontend/script.js`. Find the TODO comment inside `sendMessage()`. Wire it to your backend.
-
-### 4. Conversation context
-The `messages` array is already declared. Make sure you send the **full array** to the backend every time — not just the latest message. This is what makes the chatbot remember context.
-
-## Running Locally
+3. Start the server:
 
 ```bash
 cd backend
@@ -40,34 +40,13 @@ npm install
 npm start
 ```
 
-Open `frontend/index.html` in your browser (or use VS Code Live Server).
+### Frontend
+Start the Vite dev server:
 
-## The Architecture
-
-```
-User → Frontend (index.html) → Your Backend (/chat) → OpenRouter API
-                                     ↑
-                              API key lives here
-                              Never in the frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-## Getting Your API Keys
-
-**OpenRouter (primary):** openrouter.ai → API Keys → Create Key  
-**Gemini (fallback, free):** aistudio.google.com → Get API Key
-
-## Deployment
-
-**Backend:** Render (render.com) — New Web Service → Connect repo → Build: `cd backend && npm install` → Start: `cd backend && npm start` → Add env vars in dashboard
-
-**Frontend:** Netlify — Deploy manually → drag the `frontend/` folder
-
-## Live Deployment
-
-**Frontend URL:** <!-- Add after deploying -->  
-**Backend URL:** <!-- Add after deploying -->
-
-## What to Submit
-
-1. GitHub PR link (branch: `feature/ai-chatbot`)
-2. Google Drive video link (Anyone with link can view)
+By default the frontend calls your backend at `http://localhost:3002/chat` (via `VITE_CHAT_BACKEND_URL` in `frontend/.env.example`). After deployment, set `VITE_CHAT_BACKEND_URL` to your live backend `/chat` endpoint.

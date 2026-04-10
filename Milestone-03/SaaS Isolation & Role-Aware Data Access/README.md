@@ -1,60 +1,89 @@
-# CorpFlow Workforce Management API (v1.0-beta)
+# CorpFlow Workforce Management API (multi-tenant)
 
-Welcome to the **CorpFlow** engineering starter repository. CorpFlow is a fast-paced SaaS platform designed for high-growth companies to manage their developers, project budgets, and payroll data in one place.
+CorpFlow API with **tenant isolation** (`tenant_id`), **composite foreign keys** so relationships cannot cross tenants, **role-aware JSON** (no `password_hash`; salary and billing restricted), and **indexed** tenant queries.
 
-This repository contains the first version of the internal API, which provides a simple, direct interface for managing the workforce across multiple organizational customers like **Pouch.io** and **Velocity**.
+## Docs
 
-## 🚀 Getting Started
+- `AUDIT.md` — pre-refactor audit (specific problems).  
+- `SECURITY.md` — sensitive fields, RBAC, tenant queries, risks.
 
-### 1. Prerequisites
-- Node.js (v18 or higher)
-- PostgreSQL (v14 or higher)
+## Prerequisites
 
-### 2. Database Setup
-Create a new PostgreSQL database named `corpflow`:
+- Node.js 18+
+- PostgreSQL 14+
+
+## Database
+
 ```bash
 createdb corpflow
-```
-
-Run the schema script to Initialize the tables and seed with test data:
-```bash
-# From the project root
 npm run seed
 ```
 
-### 3. Application Setup
-Install dependencies and configure your environment:
-```bash
-npm install
-cp .env.example .env
-```
-*(Update `.env` with your database credentials.)*
+Configure `DATABASE_URL` in `.env` (see `.env.example`).
 
-### 4. Run the API
-Start the server in development mode:
+## Run
+
 ```bash
+cd "Milestone-03/SaaS Isolation & Role-Aware Data Access"   # or your path to this folder
+npm install
+cp .env.example .env   # then edit DATABASE_URL if needed
 npm start
 ```
 
-## 🛤️ API Endpoints
+**Important:** Run `npm start` from **this project directory** (where `package.json` and `.env` live). If you start Node from the repo root, `dotenv` may not load `DATABASE_URL`, and `/users` will return `Failed to resolve request context.` (the DB query in middleware throws).
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | API status and greeting |
-| GET | `/users` | List all workforce users |
-| GET | `/users/:id` | Get details for a specific user |
-| GET | `/projects` | List all active project budgets |
-| GET | `/projects/:id`| View details on a specific project |
+### Troubleshooting `Failed to resolve request context.`
 
----
+1. **`DATABASE_URL` missing** — Create `.env` next to `package.json` with a valid `postgresql://...` URL.  
+2. **PostgreSQL not running** — Start the service; errors often show `ECONNREFUSED`.  
+3. **Schema not applied** — Run `npm run seed` or `psql -f schema.sql` against the same database as `DATABASE_URL`.  
+4. In **development**, the JSON body now includes `details` (the underlying error message) to make this obvious.
 
-## 🛠️ Internal Roadmap (Upcoming Features)
-The current version is an early release. The engineering team is moving fast, and we are planning to add:
-- Advanced filtering and sorting.
-- Complex project-to-user mappings.
-- Expanded billing and payroll reporting.
-- Enhanced analytics dashboards.
+## Auth context (required for `/users` and `/projects`)
 
----
-**Status:** Alpha
-**License:** Private Internal Use Only
+Send headers on every data request:
+
+| Header | Example | Meaning |
+|--------|---------|---------|
+| `X-Tenant-Id` | `1` | Organisation (tenant) id |
+| `X-User-Id` | `1` | Acting user id (must belong to that tenant) |
+
+### Example (curl)
+
+Admin (Alice, tenant Pouch):
+
+```bash
+curl -s -H "X-Tenant-Id: 1" -H "X-User-Id: 1" http://localhost:3000/users
+```
+
+Employee (David, Velocity) — only assigned projects, no budget:
+
+```bash
+curl -s -H "X-Tenant-Id: 2" -H "X-User-Id: 4" http://localhost:3000/projects
+```
+
+Billing (admin only):
+
+```bash
+curl -s -H "X-Tenant-Id: 1" -H "X-User-Id: 1" http://localhost:3000/users/1/billing
+```
+
+## Endpoints
+
+| Method | Path | Notes |
+|--------|------|--------|
+| GET | `/` | Health / info (no headers) |
+| GET | `/users` | Tenant-scoped; shape depends on role |
+| GET | `/users/:id` | Tenant-scoped; employee = self only |
+| GET | `/users/:id/billing` | **Admin only** |
+| GET | `/projects` | Tenant-scoped; employee = assigned only |
+| GET | `/projects/:id` | Same rules |
+
+## Live deployment
+
+_Add your Render/Railway URL after deploy._
+
+## Seed summary
+
+- **Tenant 1** — Pouch: users Alice (admin), Bob (manager); project Pouch Portal.  
+- **Tenant 2** — Velocity: users Charlie (admin), David (employee); projects Velocity Engine, Secret R&D; David assigned to Velocity Engine only.

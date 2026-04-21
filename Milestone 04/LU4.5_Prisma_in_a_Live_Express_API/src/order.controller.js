@@ -1,21 +1,27 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('./lib/db');
 
 async function purchaseItem(req, res) {
   try {
     const { userId, productId } = req.body;
 
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    console.log('Product price:', product.price); 
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
 
-    const order = await prisma.order.create({
-      data: { userId, productId, quantity: 1 },
-    });
+    if (product.stock < 1) {
+      return res.status(400).json({ error: 'Product out of stock' });
+    }
 
-    await prisma.product.update({
-      where: { id: productId },
-      data: { stock: { decrement: 1 } },
-    });
+    const [order] = await prisma.$transaction([
+      prisma.order.create({
+        data: { userId, productId, quantity: 1 },
+      }),
+      prisma.product.update({
+        where: { id: productId },
+        data: { stock: { decrement: 1 } },
+      }),
+    ]);
 
     res.status(201).json({ order });
   } catch (err) {

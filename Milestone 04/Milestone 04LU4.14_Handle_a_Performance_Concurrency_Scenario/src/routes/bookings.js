@@ -3,6 +3,9 @@
 const express = require('express');
 const router  = express.Router();
 const bookingService = require('../services/bookingService');
+const { bookingLimiter } = require('../middleware/rateLimiter');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // ❌ FLAW 1: No rate limiter on this route.
 //
@@ -17,7 +20,7 @@ const bookingService = require('../services/bookingService');
 
 // POST /api/bookings/book
 // Books a seat for a show on behalf of a user
-router.post('/book', async (req, res, next) => {
+router.post('/book', bookingLimiter, async (req, res, next) => {
   try {
     const { userId, seatId, showId } = req.body;
 
@@ -47,9 +50,6 @@ router.post('/book', async (req, res, next) => {
 // Returns all bookings for a show — useful for verifying race condition results
 router.get('/show/:showId', async (req, res, next) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
-
     const bookings = await prisma.booking.findMany({
       where: { showId: Number(req.params.showId) },
       include: {

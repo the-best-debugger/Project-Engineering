@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const cors = require('cors');
+const cacheService = require('./services/cacheService');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -8,96 +9,146 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-
-const cache = new Map();
-
 // GET /tasks
 app.get('/tasks', async (req, res) => {
   try {
-    // BUG 2: Global cache key logic (Used for EVERYTHING)
-    const cacheKey = 'global_data_key';
-    
-    if (cache.has(cacheKey)) {
-      console.log('Serving from cache');
-      const cachedResult = cache.get(cacheKey);
-      // BUG 4: Missing await simulation -> If store promise, wait for it here
-      // But let's say the student forgets to even wait for it here or the code fails
-      return res.status(200).json(cachedResult);
+    const cacheKey = cacheService.createTaskListKey();
+    const cachedTasks = cacheService.get(cacheKey);
+    if (cachedTasks) {
+      return res.status(200).json(cachedTasks);
     }
 
-    // BUG 4: Missing await (Promise stored in cache)
-    const tasksPromise = prisma.task.findMany();
-    cache.set(cacheKey, tasksPromise); 
-    
-    const tasks = await tasksPromise;
+    const tasks = await prisma.task.findMany();
+    cacheService.set(cacheKey, tasks);
     res.status(200).json(tasks);
   } catch (err) {
-    // BUG 8: Errors swallowed
-    console.log('Error fetching tasks', err);
+    console.error('Error fetching tasks', err);
+    res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
 
 // GET /tasks/:id
 app.get('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-  const cacheKey = `task_${id}`;
+  const taskId = parseInt(req.params.id, 10);
+  if (Number.isNaN(taskId)) {
+    return res.status(400).json({ error: 'Task id must be a valid number' });
+  }
 
   try {
-    if (cache.has(cacheKey)) {
-      // BUG 5: Null values cached permanently
-      // If we cached null, we just return it
-      return res.status(200).json(cache.get(cacheKey));
+    const cacheKey = cacheService.createTaskKey(taskId);
+    const cachedTask = cacheService.get(cacheKey);
+    if (cachedTask) {
+      return res.status(200).json(cachedTask);
     }
 
     const task = await prisma.task.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: taskId }
     });
 
-    // BUG 5: Cached even if null
-    cache.set(cacheKey, task);
-    
-    // BUG 6: Wrong status codes (200 everywhere)
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    cacheService.set(cacheKey, task);
     res.status(200).json(task);
   } catch (err) {
-    console.log('Error fetching task', err);
+    console.error('Error fetching task', err);
+    res.status(500).json({ error: 'Failed to fetch task' });
   }
 });
 
 // POST /tasks
 app.post('/tasks', async (req, res) => {
   const { title, description, price } = req.body;
+
+  const parsedPrice = Number(price);
+  if (!title || !description || Number.isNaN(parsedPrice)) {
+    return res.status(400).json({ error: 'title, description and valid price are required' });
+  }
+
   try {
     const newTask = await prisma.task.create({
-      data: { title, description, price: parseFloat(price) }
+      data: { title, description, price: parsedPrice }
     });
 
-    // BUG 4: Missing await simulation - storing a promise
-    // Wait, if I use the return value it's fine. 
-    // Let's just create a messy caching logic here too
-    // Note: No invalidation of the 'all_tasks_data' key here
-    
-    // BUG 6: Wrong status code (should be 201)
-    res.status(200).json(newTask);
+    cacheService.delete(cacheService.createTaskListKey());
+    cacheService.set(cacheService.createTaskKey(newTask.id), newTask);
+
+    res.status(201).json(newTask);
   } catch (err) {
-    console.log('Error creating task', err);
+    console.error('Error creating task', err);
+    res.status(500).json({ error: 'Failed to create task' });
+  }
+});
+
+// PUT /tasks/:id
+app.put('/tasks/:id', async (req, res) => {
+  const taskId = parseInt(req.params.id, 10);
+  if (Number.isNaN(taskId)) {
+    return res.status(400).json({ error: 'Task id must be a valid number' });
+  }
+
+  const { title, description, price } = req.body;
+  const updateData = {};
+
+  if (title !== undefined) {
+    updateData.title = title;
+  }
+  if (description !== undefined) {
+    updateData.description = description;
+  }
+  if (price !== undefined) {
+    const parsedPrice = Number(price);
+    if (Number.isNaN(parsedPrice)) {
+      return res.status(400).json({ error: 'price must be a valid number' });
+    }
+    updateData.price = parsedPrice;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ error: 'At least one field is required for update' });
+  }
+
+  try {
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: updateData
+    });
+
+    cacheService.invalidateTask(taskId);
+    cacheService.set(cacheService.createTaskKey(taskId), updatedTask);
+    res.status(200).json(updatedTask);
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    console.error('Error updating task', err);
+    res.status(500).json({ error: 'Failed to update task' });
   }
 });
 
 // DELETE /tasks/:id
 app.delete('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
+  const taskId = parseInt(req.params.id, 10);
+  if (Number.isNaN(taskId)) {
+    return res.status(400).json({ error: 'Task id must be a valid number' });
+  }
+
   try {
     await prisma.task.delete({
-      where: { id: parseInt(id) }
+      where: { id: taskId }
     });
 
-    // BUG 1: Cache NOT invalidated after delete!
-    // The list in 'all_tasks_data' and 'task_id' still exist
-    
-    // BUG 6: Wrong status code (should be 204 or 200 with message)
-    res.status(200).json({ message: 'Deleted' });
+    cacheService.invalidateTask(taskId);
+    res.status(204).send();
   } catch (err) {
-    console.log('Error deleting task', err);
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    console.error('Error deleting task', err);
+    res.status(500).json({ error: 'Failed to delete task' });
   }
 });
 

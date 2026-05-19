@@ -24,7 +24,7 @@ import { fetchOrders } from '../mockApi'
 function SkeletonRow() {
   return (
     <tr>
-      {[40, 130, 180, 90, 80, 90].map((w, i) => (
+      {[120, 170, 120, 130, 120, 120].map((w, i) => (
         <td key={i} style={{ padding: '16px 20px' }}>
           <div style={{
             width: w, height: 13, borderRadius: 6,
@@ -35,6 +35,16 @@ function SkeletonRow() {
         </td>
       ))}
     </tr>
+  )
+}
+
+function LoadingState() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <SkeletonRow key={idx} />
+      ))}
+    </>
   )
 }
 
@@ -54,7 +64,7 @@ function OrderRow({ order }) {
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
       <td style={{ padding: '15px 20px', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>{order.id}</td>
       <td style={{ padding: '15px 20px', color: 'var(--text-primary)', fontWeight: 500 }}>{order.customer}</td>
-      <td style={{ padding: '15px 20px', color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.product}</td>
+      <td style={{ padding: '15px 20px', color: 'var(--text-muted)', fontSize: 13 }}>{order.date}</td>
       <td style={{ padding: '15px 20px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--mono)', fontSize: 13 }}>₹{order.amount.toLocaleString()}</td>
       <td style={{ padding: '15px 20px' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: s.bg, color: s.color, padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
@@ -62,25 +72,86 @@ function OrderRow({ order }) {
           {order.status}
         </span>
       </td>
-      <td style={{ padding: '15px 20px', color: 'var(--text-muted)', fontSize: 13 }}>{order.date}</td>
+      <td style={{ padding: '15px 20px' }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          background: order.priority === 'High' ? 'var(--red-dim)' : 'var(--blue-dim)',
+          color: order.priority === 'High' ? 'var(--red)' : 'var(--blue)',
+          padding: '4px 10px',
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 600,
+        }}>
+          {order.priority === 'High' ? '⚑ High' : '• Normal'}
+        </span>
+      </td>
     </tr>
   )
 }
 
-function EmptyState() {
+function SuccessState({ orders }) {
+  return (
+    <>
+      {orders.map(order => <OrderRow key={order.id} order={order} />)}
+    </>
+  )
+}
+
+function EmptyState({ isFiltered, onClearFilter }) {
   return (
     <tr>
       <td colSpan={6}>
         <div style={{ padding: '80px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-          {/* TODO: Make this look good! Add an icon, a clear heading, and a helpful message */}
-          <div style={{ fontSize: 48 }}>📭</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>No orders yet</div>
-          <div style={{ color: 'var(--text-secondary)', maxWidth: 320, lineHeight: 1.6 }}>
-            {/* TODO: Write a helpful message for the user */}
-            Write a helpful message here explaining why there are no orders
-            and what the user can do next.
+          <div style={{
+            width: 68,
+            height: 68,
+            borderRadius: 16,
+            border: '1px solid var(--border)',
+            background: 'var(--surface-2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 32,
+          }}>
+            {isFiltered ? '🔎' : '📭'}
           </div>
-          {/* TODO: Add a CTA button — e.g. "Create your first order" */}
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {isFiltered ? 'No matching orders found' : 'No orders yet'}
+          </div>
+          <div style={{ color: 'var(--text-secondary)', maxWidth: 320, lineHeight: 1.6 }}>
+            {isFiltered
+              ? 'No orders match the current status filter. Clear filters to view all orders.'
+              : 'Orders from operations, warehouse, and customer support teams will appear here once created.'}
+          </div>
+          {isFiltered ? (
+            <button onClick={onClearFilter} style={{
+              marginTop: 8,
+              padding: '10px 24px',
+              background: 'var(--accent)',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              color: '#000',
+              fontSize: 14,
+              fontWeight: 700,
+            }}>
+              Clear filters
+            </button>
+          ) : (
+            <button style={{
+              marginTop: 8,
+              padding: '10px 24px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              color: 'var(--text-primary)',
+              fontSize: 14,
+              fontWeight: 500,
+            }}>
+              Create your first order
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -88,29 +159,70 @@ function EmptyState() {
 }
 
 function ErrorState({ message, onRetry }) {
+  const getErrorDetails = (text) => {
+    if (!text) {
+      return {
+        title: 'Unable to load orders',
+        body: 'No response received from the orders service. Please retry.',
+      }
+    }
+    if (text.includes('503')) {
+      return {
+        title: 'Orders service is temporarily unavailable',
+        body: 'The API returned 503. Wait a few seconds and retry. If the issue persists, contact platform support.',
+      }
+    }
+    if (text.toLowerCase().includes('network')) {
+      return {
+        title: 'Network issue detected',
+        body: 'Orderly could not reach the API. Check connectivity and retry.',
+      }
+    }
+    if (text.toLowerCase().includes('timeout')) {
+      return {
+        title: 'Request timed out',
+        body: 'The server took too long to respond. Retry once your connection is stable.',
+      }
+    }
+    return {
+      title: 'Order fetch failed',
+      body: text,
+    }
+  }
+
+  const details = getErrorDetails(message)
+
   return (
     <tr>
       <td colSpan={6}>
         <div style={{ padding: '80px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-          {/* TODO: Make this look good! Add an error icon, clear heading, and the error message */}
-          <div style={{ fontSize: 48 }}>⚠️</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Something went wrong</div>
-          <div style={{ color: 'var(--text-secondary)', maxWidth: 340, fontSize: 14, fontFamily: 'var(--mono)' }}>
-            {/* TODO: Display the actual error message here */}
-            Error message goes here
+          <div style={{
+            width: 68,
+            height: 68,
+            borderRadius: 16,
+            border: '1px solid rgba(239,68,68,0.35)',
+            background: 'var(--red-dim)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 32,
+          }}>
+            ⚠️
           </div>
-          {/* TODO: Implement the Retry button — call onRetry when clicked */}
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{details.title}</div>
+          <div style={{ color: 'var(--text-secondary)', maxWidth: 340, fontSize: 14, fontFamily: 'var(--mono)' }}>
+            {details.body}
+          </div>
           <button onClick={onRetry} style={{
             marginTop: 8,
             padding: '10px 24px',
-            background: 'transparent',
-            border: '1px solid var(--border)',
+            background: 'var(--red-dim)',
+            border: '1px solid rgba(239,68,68,0.35)',
             borderRadius: 'var(--radius)',
-            color: 'var(--text-primary)',
+            color: '#fecaca',
             fontSize: 14, fontWeight: 500, cursor: 'pointer',
           }}>
-            {/* TODO: Add a retry icon and label */}
-            Retry
+            ↻ Retry request
           </button>
         </div>
       </td>
@@ -124,6 +236,7 @@ export default function OrdersDashboard() {
   const [orders,  setOrders]  = useState([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const loadOrders = () => {
     // Reset state before each fetch
@@ -133,7 +246,13 @@ export default function OrdersDashboard() {
 
     fetchOrders()
       .then(data => {
-        setOrders(data)
+        const enrichedOrders = data.map((order) => ({
+          ...order,
+          priority: order.status === 'Pending' || order.status === 'Processing' || order.amount >= 15000
+            ? 'High'
+            : 'Normal',
+        }))
+        setOrders(enrichedOrders)
         setLoading(false)
       })
       .catch(err => {
@@ -148,8 +267,15 @@ export default function OrdersDashboard() {
 
   // DASHBOARD STATS (already implemented — do not change)
   const totalRevenue   = orders.reduce((s, o) => s + (o.status !== 'Cancelled' ? o.amount : 0), 0)
-  const delivered      = orders.filter(o => o.status === 'Delivered').length
-  const pending        = orders.filter(o => o.status === 'Pending' || o.status === 'Processing').length
+  const needsAttention = orders.filter(o => o.status === 'Pending' || o.status === 'Processing').length
+  const statusBreakdown = orders.reduce((acc, order) => {
+    acc[order.status] = (acc[order.status] || 0) + 1
+    return acc
+  }, {})
+  const visibleOrders = statusFilter === 'all'
+    ? orders
+    : orders.filter(order => order.status === statusFilter)
+  const emptyFromFilter = !loading && !error && orders.length > 0 && visibleOrders.length === 0
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 32px' }}>
@@ -173,11 +299,11 @@ export default function OrdersDashboard() {
       </div>
 
       {/* ── STAT CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 16 }}>
         {[
-          { label: 'Total Revenue',    value: loading ? '—' : `₹${totalRevenue.toLocaleString()}`, icon: '💰', color: 'var(--accent)'  },
-          { label: 'Delivered',        value: loading ? '—' : delivered,                            icon: '✅', color: 'var(--green)'  },
-          { label: 'Needs Attention',  value: loading ? '—' : pending,                              icon: '⏳', color: 'var(--purple)' },
+          { label: 'Total Orders', value: loading ? '—' : orders.length, icon: '🧾', color: 'var(--blue)' },
+          { label: 'Total Value', value: loading ? '—' : `₹${totalRevenue.toLocaleString()}`, icon: '💰', color: 'var(--accent)' },
+          { label: 'Needs Attention', value: loading ? '—' : needsAttention, icon: '⏳', color: 'var(--purple)' },
         ].map((card, i) => (
           <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px 28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -187,6 +313,57 @@ export default function OrdersDashboard() {
             <div style={{ fontSize: 30, fontWeight: 700, color: card.color, fontFamily: 'var(--mono)' }}>{card.value}</div>
           </div>
         ))}
+      </div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        marginBottom: 32,
+        padding: '14px 16px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Status breakdown:</span>
+          {loading ? (
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Calculating...</span>
+          ) : Object.keys(statusBreakdown).sort().map(status => (
+            <span key={status} style={{
+              fontSize: 12,
+              color: 'var(--text-primary)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 20,
+              padding: '4px 10px',
+            }}>
+              {status}: {statusBreakdown[status]}
+            </span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label htmlFor="status-filter" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Filter</label>
+          <select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--text-primary)',
+              fontSize: 13,
+              padding: '6px 10px',
+            }}
+          >
+            <option value="all">All statuses</option>
+            {Object.keys(statusBreakdown).sort().map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* ── ORDERS TABLE ── */}
@@ -206,7 +383,7 @@ export default function OrdersDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Order ID', 'Customer', 'Product', 'Amount', 'Status', 'Date'].map(h => (
+                {['Order ID', 'Customer Name', 'Order Date', 'Total Amount', 'Status', 'Priority Flag'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '12px 20px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                     {h}
                   </th>
@@ -215,31 +392,15 @@ export default function OrdersDashboard() {
             </thead>
             <tbody>
 
-              {/* 
-               *  YOUR WORK STARTS HERE
-               *
-               *  Currently this just dumps raw JSON. Replace the
-               *  block below with proper conditional rendering
-               *  for all 4 UX states.
-               * ═══════════════════════════════════════════════ */}
-
-              {/* 🔴 PLACEHOLDER — DELETE THIS ENTIRE BLOCK AND REPLACE IT */}
-              <tr>
-                <td colSpan={6} style={{ padding: 32 }}>
-                  <div style={{ background: 'var(--surface-2)', border: '1px dashed var(--border)', borderRadius: 8, padding: 24 }}>
-                    <p style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: 8, fontFamily: 'var(--mono)', fontSize: 13 }}>
-                      🚧 TODO: Implement the 4 UX states here
-                    </p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
-                      Current raw data dump (replace with proper UI):
-                    </p>
-                    <pre style={{ color: 'var(--text-secondary)', fontSize: 11, fontFamily: 'var(--mono)', lineHeight: 1.6, overflowX: 'auto' }}>
-                      {JSON.stringify({ loading, error, ordersCount: orders.length }, null, 2)}
-                    </pre>
-                  </div>
-                </td>
-              </tr>
-              {/* 🔴 END OF PLACEHOLDER */}
+              {loading && <LoadingState />}
+              {!loading && error && <ErrorState message={error} onRetry={loadOrders} />}
+              {!loading && !error && visibleOrders.length > 0 && <SuccessState orders={visibleOrders} />}
+              {!loading && !error && visibleOrders.length === 0 && (
+                <EmptyState
+                  isFiltered={emptyFromFilter}
+                  onClearFilter={() => setStatusFilter('all')}
+                />
+              )}
 
             </tbody>
           </table>
@@ -252,6 +413,7 @@ export default function OrdersDashboard() {
           0%   { background-position: -200% 0 }
           100% { background-position:  200% 0 }
         }
+        tbody { transition: opacity 0.2s ease; }
       `}</style>
     </div>
   )

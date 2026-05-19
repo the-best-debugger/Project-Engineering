@@ -1,12 +1,10 @@
 import React from 'react';
 import { useOrders } from '../hooks/useOrders';
 import OrderCard from '../components/OrderCard';
+import { SkeletonCard, ErrorMessage, EmptyState } from '../components/states';
 
 const Orders = () => {
-  const { data: orders, isLoading, error } = useOrders();
-
-  // DELIBERATE GAP: isLoading and error are ignored.
-  // No check for orders.length === 0.
+  const { data: orders, isLoading, error, refetch } = useOrders();
 
   return (
     <div className="p-8">
@@ -17,11 +15,31 @@ const Orders = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {orders && orders.map(order => (
-          <OrderCard key={order.id} order={order} />
-        ))}
-      </div>
+      {isLoading && <SkeletonCard count={4} variant="order" />}
+
+      {!isLoading && error && (
+        <ErrorMessage
+          message="We couldn't load your orders. Check your connection and try again."
+          onRetry={refetch}
+        />
+      )}
+
+      {!isLoading && !error && Array.isArray(orders) && orders.length === 0 && (
+        <EmptyState
+          title="No orders yet"
+          message="When customers place orders, they will show up here. You can export a report once you have data."
+          actionLabel="Refresh"
+          onAction={refetch}
+        />
+      )}
+
+      {!isLoading && !error && orders && orders.length > 0 && (
+        <div className="grid grid-cols-1 gap-4">
+          {orders.map((order) => (
+            <OrderCard key={order.id} order={order} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

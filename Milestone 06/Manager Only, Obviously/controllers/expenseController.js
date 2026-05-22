@@ -32,11 +32,22 @@ export const createExpense = async (req, res) => {
 
 // @desc    Update an expense
 // @route   PUT /api/expenses/:id
-// @access  Protected (Gap 4 — No ownership check)
+// @access  Protected — owner only (managers approve/reject; cannot edit others' content)
 export const updateExpense = async (req, res) => {
-  // ❌ Any user can update any expense — no check: expense.submittedBy === req.user.userId
-  const expense = await Expense.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  res.json(expense);
+  const expense = await Expense.findById(req.params.id);
+
+  if (!expense) {
+    return res.status(404).json({ message: 'Expense not found' });
+  }
+
+  const isOwner = expense.submittedBy.toString() === req.user._id.toString();
+
+  if (!isOwner) {
+    return res.status(403).json({ message: 'You can only modify your own expenses.' });
+  }
+
+  const updated = await Expense.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
 };
 
 // @desc    Approve an expense
@@ -67,6 +78,12 @@ export const rejectExpense = async (req, res) => {
 // @route   DELETE /api/expenses/:id
 // @access  Protected (Should be admin-only)
 export const deleteExpense = async (req, res) => {
-  const expense = await Expense.findByIdAndDelete(req.params.id);
+  const expense = await Expense.findById(req.params.id);
+
+  if (!expense) {
+    return res.status(404).json({ message: 'Expense not found' });
+  }
+
+  await expense.deleteOne();
   res.json({ message: 'Expense removed' });
 };

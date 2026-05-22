@@ -31,7 +31,10 @@ const FragmentCard = ({ fragment, onUpdate, onDelete }) => {
     };
 
     // BROKEN PART 3: UI driven by mutable role from context/localStorage
-    const canEdit = role === 'admin' || role === 'curator' || (role === 'contributor' && fragment.userId === user?.id);
+    const canEdit =
+      role === 'admin' ||
+      role === 'curator' ||
+      (role === 'contributor' && fragment.userId === user?.id);
     const canDelete = role === 'admin';
     const canApprove = (role === 'admin' || role === 'curator') && fragment.status !== 'published';
 

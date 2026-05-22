@@ -1,53 +1,88 @@
-
 const express = require('express');
 const router = express.Router();
 const { fragments, users } = require('../data/store');
 const auth = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
+const csrfProtect = require('../middleware/csrf');
 
 router.get('/', (req, res) => {
   res.json(fragments);
 });
 
-// BROKEN PART 4: Missing role checks/poor validation
-// Any logged in user can add fragment (should be Contributor and above)
-router.post('/', auth, (req, res) => {
-  const { content, parentId } = req.body;
-  const newFrag = {
-    id: Date.now().toString(),
-    content,
-    parentId,
-    userId: req.user.userId,
-    author: users.find(u => u.id === req.user.userId)?.email,
-    status: 'published', // Automatically published for now
-    createdAt: new Date()
-  };
-  fragments.push(newFrag);
-  res.status(201).json(newFrag);
-});
+// Create — Contributor, Curator, Admin
+router.post(
+  '/',
+  auth,
+  csrfProtect,
+  roleCheck(['contributor', 'curator', 'admin']),
+  (req, res) => {
+    const { content, parentId } = req.body;
+    const newFrag = {
+      id: Date.now().toString(),
+      content,
+      parentId,
+      userId: req.user.userId,
+      author: users.find((u) => u.id === req.user.userId)?.email,
+      status: req.user.role === 'contributor' ? 'pending' : 'published',
+      createdAt: new Date(),
+    };
+    fragments.push(newFrag);
+    res.status(201).json(newFrag);
+  }
+);
 
-// BROKEN PART 4: No owner check for contributors
-router.put('/:id', auth, (req, res) => {
-  const frag = fragments.find(f => f.id === req.params.id);
-  if(!frag) return res.status(404).json({ error: 'Fragment not found' });
-  frag.content = req.body.content;
-  res.json(frag);
-});
+// Edit — Contributor (own only), Curator, Admin
+router.put(
+  '/:id',
+  auth,
+  csrfProtect,
+  roleCheck(['contributor', 'curator', 'admin']),
+  (req, res) => {
+    const frag = fragments.find((f) => f.id === req.params.id);
+    if (!frag) return res.status(404).json({ error: 'Fragment not found' });
 
-// BROKEN PART 4: No Curator requirement
-router.post('/:id/approve', auth, (req, res) => {
-  const frag = fragments.find(f => f.id === req.params.id);
-  if(!frag) return res.status(404).json({ error: 'Fragment not found' });
-  frag.status = 'published';
-  res.json(frag);
-});
+    const isOwner = frag.userId === req.user.userId;
+    const isPrivileged = ['curator', 'admin'].includes(req.user.role);
 
-// BROKEN PART 4: Any user can delete, should be Admin only
-router.delete('/:id', auth, (req, res) => {
-  const index = fragments.findIndex(f => f.id === req.params.id);
-  if (index === -1) return res.status(404).json({ error: 'Not found' });
-  fragments.splice(index, 1);
-  res.json({ message: 'Deleted' });
-});
+    if (req.user.role === 'contributor' && !isOwner) {
+      return res.status(403).json({ error: 'You can only edit your own fragments' });
+    }
+
+    if (!isOwner && !isPrivileged) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    frag.content = req.body.content;
+    res.json(frag);
+  }
+);
+
+// Approve — Curator, Admin
+router.post(
+  '/:id/approve',
+  auth,
+  csrfProtect,
+  roleCheck(['curator', 'admin']),
+  (req, res) => {
+    const frag = fragments.find((f) => f.id === req.params.id);
+    if (!frag) return res.status(404).json({ error: 'Fragment not found' });
+    frag.status = 'published';
+    res.json(frag);
+  }
+);
+
+// Delete — Admin only
+router.delete(
+  '/:id',
+  auth,
+  csrfProtect,
+  roleCheck(['admin']),
+  (req, res) => {
+    const index = fragments.findIndex((f) => f.id === req.params.id);
+    if (index === -1) return res.status(404).json({ error: 'Not found' });
+    fragments.splice(index, 1);
+    res.json({ message: 'Deleted' });
+  }
+);
 
 module.exports = router;

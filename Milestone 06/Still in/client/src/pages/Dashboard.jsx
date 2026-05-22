@@ -1,8 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getPoll, vote } from '../api/poll';
 import { LogOut, RefreshCcw, Vote, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+};
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -12,7 +22,28 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const intervalRef = useRef(null);
 
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const endSession = useCallback(() => {
+    stopPolling();
+    logout();
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+  }, [stopPolling, logout]);
+
   const fetchPoll = async (showLoading = false) => {
+    const token = localStorage.getItem('token');
+    if (isTokenExpired(token)) {
+      endSession();
+      return;
+    }
+
     if (showLoading) setLoading(true);
     try {
       const data = await getPoll();
@@ -20,7 +51,9 @@ const Dashboard = () => {
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to fetch poll', err);
-      // INTENTIONAL: NO REDIRECTION ON FAIL DURING POLLING
+      if (err.response?.status === 401) {
+        endSession();
+      }
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -29,13 +62,21 @@ const Dashboard = () => {
   useEffect(() => {
     fetchPoll(true);
 
-    // AUTO-REFRESH EVERY 10 SECONDS
     intervalRef.current = setInterval(() => {
       fetchPoll();
     }, 10000);
 
-    return () => clearInterval(intervalRef.current);
-  }, []);
+    const onSessionExpired = () => {
+      stopPolling();
+      logout();
+    };
+    window.addEventListener('auth:session-expired', onSessionExpired);
+
+    return () => {
+      stopPolling();
+      window.removeEventListener('auth:session-expired', onSessionExpired);
+    };
+  }, [stopPolling, logout]);
 
   const handleVote = async (optionId) => {
     setVoting(optionId);
@@ -43,19 +84,25 @@ const Dashboard = () => {
       await vote(optionId);
       await fetchPoll();
     } catch (err) {
-      // INTENTIONAL MISHANDLING: JUST SHOW ALERT
-      alert(err.response?.data?.message || 'Vote failed. Token might be expired.');
-      // The user remains on the dashboard, and the polling continues even if 401 or 500
+      if (err.response?.status === 401) {
+        endSession();
+        return;
+      }
+      alert(err.response?.data?.message || 'Vote failed.');
     } finally {
       setVoting(null);
     }
+  };
+
+  const handleLogout = () => {
+    stopPolling();
+    logout();
   };
 
   const totalVotes = polls.reduce((sum, p) => sum + p.count, 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      {/* Header */}
       <header className="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
         <div className="flex items-center space-x-4">
           <div className="bg-blue-600 p-2 rounded-lg">
@@ -67,7 +114,7 @@ const Dashboard = () => {
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="flex items-center space-x-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-2 rounded-lg transition-colors border border-red-500/50 font-bold"
         >
           <LogOut size={18} />
@@ -75,7 +122,6 @@ const Dashboard = () => {
         </button>
       </header>
 
-      {/* Poll Card */}
       <main className="bg-slate-800 p-8 rounded-3xl shadow-xl border border-slate-700 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-4 flex items-center space-x-2 text-slate-500 text-sm">
           {loading ? (
@@ -103,13 +149,12 @@ const Dashboard = () => {
                   </h3>
                   <span className="text-2xl font-black text-blue-400">{Math.round(percentage)}%</span>
                 </div>
-                
-                {/* Animated Progress Bar */}
+
                 <div className="h-4 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${percentage}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
+                    transition={{ duration: 1, ease: 'easeOut' }}
                     className="h-full bg-gradient-to-r from-blue-600 to-indigo-600"
                   />
                 </div>
@@ -118,9 +163,9 @@ const Dashboard = () => {
                   onClick={() => handleVote(option.id)}
                   disabled={voting !== null}
                   className={`w-full py-4 rounded-xl flex items-center justify-center space-x-2 font-black transition-all transform active:scale-95 ${
-                    voting === option.id 
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                    : 'bg-white text-slate-900 hover:bg-blue-50 px-6'
+                    voting === option.id
+                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                      : 'bg-white text-slate-900 hover:bg-blue-50 px-6'
                   }`}
                 >
                   {voting === option.id ? (

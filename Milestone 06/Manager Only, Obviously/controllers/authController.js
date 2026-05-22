@@ -8,9 +8,8 @@ export const login = async (req, res) => {
   const user = await User.findOne({ email });
 
   if (user && (await user.matchPassword(password))) {
-    // Gap 1 — Role missing from JWT payload
     const token = jwt.sign(
-      { userId: user._id, email: user.email }, // ❌ missing role
+      { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -19,7 +18,7 @@ export const login = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
-      role: user.role, // role included in response but NOT in JWT
+      role: user.role,
       token
     });
   } else {
@@ -41,7 +40,7 @@ export const signup = async (req, res) => {
 
   if (user) {
     const token = jwt.sign(
-      { userId: user._id, email: user.email }, // ❌ missing role
+      { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );

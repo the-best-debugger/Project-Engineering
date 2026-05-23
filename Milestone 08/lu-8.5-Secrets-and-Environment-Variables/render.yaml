@@ -1,6 +1,10 @@
 # render.yaml — Render Blueprint for NoteVault
-# BUG: DATABASE_URL and JWT_SECRET are NOT listed as environment variables.
-# This means the service will deploy without the critical config it needs.
+
+databases:
+  - name: notevault-db
+    plan: free
+    databaseName: notevault
+    user: notevault
 
 services:
   - type: web
@@ -13,5 +17,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # DATABASE_URL is missing here!
-      # JWT_SECRET is missing here!
+      - key: DATABASE_URL
+        fromDatabase:
+          name: notevault-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true

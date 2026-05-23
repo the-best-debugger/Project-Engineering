@@ -5,7 +5,6 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
-const { JWT_SECRET } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -37,8 +36,7 @@ router.post("/signup", async (req, res) => {
       },
     });
 
-    // Generate JWT — uses the HARDCODED secret imported from middleware
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
@@ -74,8 +72,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    // Generate JWT — uses the HARDCODED secret imported from middleware
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 

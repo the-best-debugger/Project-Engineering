@@ -3,15 +3,6 @@
 
 const jwt = require("jsonwebtoken");
 
-// ============================================================
-// BUG: The JWT secret is HARDCODED. In production, this means:
-//   1. Anyone who reads the source code knows the secret.
-//   2. Tokens signed locally won't match if the prod secret
-//      is different (or missing entirely).
-// ============================================================
-
-const JWT_SECRET = "super-secret-key-123";
-
 const authenticate = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -21,7 +12,7 @@ const authenticate = (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.userId = decoded.userId;
     next();
@@ -30,4 +21,4 @@ const authenticate = (req, res, next) => {
   }
 };
 
-module.exports = { authenticate, JWT_SECRET };
+module.exports = { authenticate };

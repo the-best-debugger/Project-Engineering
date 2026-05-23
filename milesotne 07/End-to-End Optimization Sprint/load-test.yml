@@ -1,0 +1,17 @@
+config:
+  target: "http://localhost:3001"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp to 50 users/sec"
+  ensure:
+    maxErrorRate: 5
+
+scenarios:
+  - name: "Paginated missions list"
+    flow:
+      - get:
+          url: "/api/missions?page=1&limit=20"
+          expect:
+            - statusCode: 200

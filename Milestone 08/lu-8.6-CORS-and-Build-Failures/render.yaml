@@ -1,5 +1,11 @@
 # render.yaml — Render Blueprint for LinkShelf
 
+databases:
+  - name: linkshelf-db
+    plan: free
+    databaseName: linkshelf
+    user: linkshelf
+
 services:
   # ---- Backend API ----
   - type: web
@@ -7,14 +13,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    # ================================================================
-    # BUG #3: Build command is missing `npx prisma generate`.
-    # Without it, the Prisma Client is never generated in production.
-    # The server will start fine, the health check will pass, but the
-    # FIRST database query will crash with:
-    #   "PrismaClientInitializationError: Prisma Client has not been generated yet"
-    # ================================================================
-    buildCommand: npm install
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -25,10 +24,11 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      # ================================================================
-      # BUG #2 (partial): CORS_ORIGIN is missing here!
-      # The backend needs to know the frontend URL for CORS.
-      # ================================================================
+      - key: CORS_ORIGIN
+        fromService:
+          type: web
+          name: linkshelf-frontend
+          envVarKey: RENDER_EXTERNAL_URL
 
   # ---- Frontend (Static Site) ----
   - type: web
@@ -42,9 +42,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # ================================================================
-      # BUG #2: VITE_API_URL is NOT set here!
-      # The Vite build needs this at BUILD TIME to bake the API URL
-      # into the frontend bundle. Without it, the app will try to
-      # call "undefined/api/..." which obviously fails.
-      # ================================================================
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: linkshelf-api
+          envVarKey: RENDER_EXTERNAL_URL

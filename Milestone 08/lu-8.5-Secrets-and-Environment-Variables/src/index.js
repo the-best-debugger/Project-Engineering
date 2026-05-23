@@ -2,6 +2,7 @@
 // NoteVault API — Express Server Entry Point
 
 require("dotenv").config();
+const { validateEnv } = require("./config/validateEnv");
 const express = require("express");
 const cors = require("cors");
 
@@ -10,17 +11,10 @@ const authRoutes = require("./routes/auth");
 const notesRoutes = require("./routes/notes");
 const healthRoutes = require("./routes/health");
 
+validateEnv();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// ============================================================
-// BUG: There is NO validateEnv() function here.
-// The server starts WITHOUT checking if critical environment
-// variables (DATABASE_URL, JWT_SECRET) are defined.
-// In production, this means the app boots, seems "fine",
-// and then crashes on the FIRST database or auth request —
-// making it much harder to debug than a clean startup error.
-// ============================================================
 
 // Middleware
 app.use(cors());

@@ -1,13 +1,5 @@
 // frontend/src/config.js
-// API configuration for the frontend
-
-// ============================================================
-// This code is CORRECT — it reads from the Vite env variable.
-// The BUG is that VITE_API_URL is not set in the Render
-// dashboard, so `import.meta.env.VITE_API_URL` is undefined
-// at build time. The built bundle will contain "undefined"
-// as the API URL, causing all requests to fail.
-// ============================================================
+// API configuration — VITE_API_URL is injected at build time by Vite
 
 export const API_URL = import.meta.env.VITE_API_URL;
 
@@ -27,6 +19,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   const response = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       ...defaultHeaders,
       ...options.headers,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../config';
 
 const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -10,8 +11,6 @@ const Login = ({ setUser }) => {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -15,61 +15,96 @@ Analyse the provided job description and return ONLY a JSON object with these ex
 Return ONLY valid JSON. No markdown. No explanation text.`
 
 export async function analyzeJobDescription(text, userId) {
-  // ❌ Gap 2: No AbortController — this call can hang indefinitely
-  // ❌ Gap 3: No try/catch — any LLM error throws and crashes the server
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://jobscan.app',
-      'X-Title': 'JobScan AI'
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: text }
-      ],
-      max_tokens: 600,
-      temperature: 0.2
-    })
-    // ❌ Gap 2: No signal: controller.signal here
-  })
-
-  // ❌ Gap 3: If response is an error, data.choices is undefined.
-  //           data.choices[0].message.content throws TypeError.
-  //           Node.js process exits. Server is down.
-  const data = await response.json()
-
-  // Token logging (present — students can see what a working log looks like)
-  if (data.usage) {
-    console.log('[AI_USAGE]', JSON.stringify({
-      timestamp: new Date().toISOString(),
-      userId,
-      model: 'openai/gpt-4o-mini',
-      promptTokens: data.usage.prompt_tokens,
-      completionTokens: data.usage.completion_tokens,
-      totalTokens: data.usage.total_tokens,
-      endpoint: 'analyze_job_description'
-    }))
-  }
-
-  // ❌ Gap 3: This throws if data.choices is missing — no try/catch wraps it
-  const content = data.choices[0].message.content
+  // Guardrail 2 & 3: timeout + error handling
+  const controller = new AbortController()
+  const timeoutMs = 15000
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    return JSON.parse(content)
-  } catch {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://jobscan.app',
+        'X-Title': 'JobScan AI'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: text }
+        ],
+        max_tokens: 600,
+        temperature: 0.2
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`LLM API Error: ${response.status} ${errText}`)
+    }
+
+    const data = await response.json()
+
+    // Token logging (present — students can see what a working log looks like)
+    if (data.usage) {
+      console.log('[AI_USAGE]', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        userId,
+        model: 'openai/gpt-4o-mini',
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+        endpoint: 'analyze_job_description'
+      }))
+    }
+
+    const content = data?.choices?.[0]?.message?.content
+
+    try {
+      return JSON.parse(content)
+    } catch {
+      return {
+        title: 'Unknown',
+        experienceLevel: 'unknown',
+        requiredSkills: [],
+        responsibilities: [],
+        salaryRange: 'unspecified',
+        industryType: 'unknown',
+        remotePolicy: 'unspecified',
+        rawContent: content
+      }
+    }
+  } catch (err) {
+    clearTimeout(timeoutId)
+
+    if (err.name === 'AbortError') {
+      console.error('[AI_TIMEOUT]', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        userId,
+        timeoutMs
+      }))
+      return {
+        success: false,
+        fallback: true,
+        message: 'Analysis unavailable. Please try again shortly.'
+      }
+    }
+
+    console.error('[AI_ERROR]', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId,
+      error: err.message
+    }))
+
     return {
-      title: 'Unknown',
-      experienceLevel: 'unknown',
-      requiredSkills: [],
-      responsibilities: [],
-      salaryRange: 'unspecified',
-      industryType: 'unknown',
-      remotePolicy: 'unspecified',
-      rawContent: content
+      success: false,
+      fallback: true,
+      message: 'Analysis unavailable. Please try again shortly.'
     }
   }
 }

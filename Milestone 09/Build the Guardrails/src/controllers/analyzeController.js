@@ -4,25 +4,34 @@ import { analyzeJobDescription } from '../services/aiService.js'
 export async function analyzeController(req, res) {
   const { text } = req.body
 
-  // ❌ Gap 1: No input validation — empty text calls the LLM
-  // ❌ Gap 1: No length check — 50,000 char inputs call the LLM at high cost
-  if (!text) {
-    // Only basic presence check — no length guard
+  // Guardrail 1: Empty input check
+  if (!text || text.trim().length === 0) {
     return res.status(400).json({
-      error: 'missing_field',
-      message: 'text field is required'
+      error: 'input_required',
+      message: 'Job description text is required.'
     })
   }
 
-  // ❌ Gap 1: Should check text.length > 3000 and return 400 here
-  //           Instead, all inputs proceed to the AI service
+  // Guardrail 1: Length validation (hard limit)
+  if (text.length > 3000) {
+    return res.status(400).json({
+      error: 'input_too_long',
+      limit: 3000,
+      received: text.length
+    })
+  }
 
-  // ❌ Gap 3: No try/catch — errors from analyzeJobDescription bubble up and crash
-  const analysis = await analyzeJobDescription(text, req.user.id)
+  // Call AI service — the service now returns a fallback object on timeout/error
+  const result = await analyzeJobDescription(text, req.user.id)
 
-  res.status(200).json({
+  // Guardrail 3: if the AI service returned a fallback response, surface 503
+  if (result?.fallback === true) {
+    return res.status(503).json(result)
+  }
+
+  return res.status(200).json({
     success: true,
-    analysis,
+    analysis: result,
     characterCount: text.length
   })
 }

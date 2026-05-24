@@ -35,6 +35,18 @@ export async function summarizeNote(noteContent, userId) {
   //   data.usage.completion_tokens ← tokens in the generated summary
   //   data.usage.total_tokens     ← sum of both
   // Log all three fields plus model name and timestamp using console.log('[AI_USAGE]', JSON.stringify({...}))
+  const usage = data.usage
+  if (usage) {
+    console.log('[AI_USAGE]', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId,
+      model: 'openai/gpt-4o-mini',
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+      totalTokens: usage.total_tokens,
+      endpoint: 'summarize_note'
+    }))
+  }
 
   if (!data.choices || !data.choices[0]) {
     throw new Error(`Invalid LLM response: ${JSON.stringify(data)}`)

@@ -17,7 +17,7 @@ CREATE TABLE customers (
 -- The customer_id column should have a REFERENCES customers(id) constraint, but it's missed here.
 CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
-    customer_id INTEGER, -- NO FOREIGN KEY!
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     status VARCHAR(20) DEFAULT 'pending',
     total DECIMAL(10,2) DEFAULT 0.00,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -29,7 +29,7 @@ CREATE TABLE products (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     sku VARCHAR(50) NOT NULL UNIQUE,
-    inventory_count INTEGER DEFAULT 0, -- NO CHECK CONSTRAINT!
+    inventory_count INTEGER DEFAULT 0 CHECK (inventory_count >= 0),
     price DECIMAL(10,2) NOT NULL
 );
 
@@ -46,7 +46,7 @@ CREATE TABLE order_items (
 -- The order_id column should have a UNIQUE constraint to ensure only one payment record per order.
 CREATE TABLE payments (
     id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL, -- NO UNIQUE CONSTRAINT!
+    order_id INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
     amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(20) DEFAULT 'pending', -- Can be 'pending' or 'completed'
     created_at TIMESTAMPTZ DEFAULT NOW()

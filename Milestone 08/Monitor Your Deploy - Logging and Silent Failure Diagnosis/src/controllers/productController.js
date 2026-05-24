@@ -2,11 +2,15 @@ import Product from '../models/Product.js';
 
 export const getProducts = async (req, res) => {
   try {
-    // Bug: category can be undefined — returns empty array with no error
-    const products = await Product.find({ category: req.query.category });
+    const filter = {};
+    if (req.query.category) {
+      filter.category = req.query.category;
+    }
+
+    const products = await Product.find(filter);
     res.json(products);
   } catch (err) {
-    // No console.error — errors swallowed silently
+    console.error('Error:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 };

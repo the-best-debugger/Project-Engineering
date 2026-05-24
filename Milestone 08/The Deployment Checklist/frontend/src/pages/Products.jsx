@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 
 const Products = ({ user }) => {
   const [products, setProducts] = useState([]);
@@ -6,8 +7,6 @@ const Products = ({ user }) => {
   const [error, setError] = useState('');
   const [newProduct, setNewProduct] = useState({ name: '', description: '', price: 0, stock: 0 });
   const [message, setMessage] = useState({ text: '', type: '' });
-
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
   useEffect(() => {
     fetchProducts();

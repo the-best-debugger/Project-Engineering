@@ -1,14 +1,23 @@
 name: CI
+
 on: [push, pull_request]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - run: npm install
+          node-version: '20'
+
+      - name: Backend install and build
+        working-directory: ./backend
+        run: npm install && npm run build
+
+      - name: Frontend install and build
         working-directory: ./frontend
-      - run: npm run build
-        working-directory: ./frontend
+        env:
+          VITE_API_BASE_URL: https://launchpad-api.onrender.com/api
+        run: npm install && npm run build
